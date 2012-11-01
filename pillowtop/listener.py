@@ -20,23 +20,26 @@ WAIT_HEARTBEAT = 10000
 def old_changes(pillow):
     from couchdbkit import Server, Consumer
     c = Consumer(pillow.couch_db, backend='gevent')
+    req_kwargs = pillow.couch_req_kwargs or {}
     while True:
         try:
             c.wait(pillow.parsing_processor, since=pillow.since, filter=pillow.couch_filter,
-                heartbeat=WAIT_HEARTBEAT, feed='continuous', timeout=30000)
+                heartbeat=WAIT_HEARTBEAT, feed='continuous', timeout=30000, **req_kwargs)
         except Exception, ex:
             logging.exception("Exception in form listener: %s, sleeping and restarting" % ex)
             gevent.sleep(5)
 
 def new_changes(pillow):
-     with ChangesStream(pillow.couch_db, feed='continuous', heartbeat=True, since=pillow.since,
-         filter=pillow.couch_filter) as st:
+    req_kwargs = pillow.couch_req_kwargs or {}
+    with ChangesStream(pillow.couch_db, feed='continuous', heartbeat=True, since=pillow.since,
+        filter=pillow.couch_filter, **req_kwargs) as st:
         for c in st:
             pillow.processor(c)
 
 class BasicPillow(object):
     couch_filter = None # string for filter if needed
     couch_db = None #couchdbkit Database Object
+    couch_req_kwargs = None
     changes_seen = 0
 
     def run(self, since=0):
