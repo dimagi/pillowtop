@@ -12,6 +12,11 @@ from gevent import socket
 import rawes
 import gevent
 from django.conf import settings
+import logging
+import time
+
+requests_log = logging.getLogger("requests")
+requests_log.setLevel(logging.ERROR)
 import couchdbkit
 
 from dimagi.utils.decorators.memoized import memoized
