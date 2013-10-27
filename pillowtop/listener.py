@@ -7,6 +7,7 @@ import traceback
 import math
 
 from django.core.mail import send_mail
+from rawes.elastic_exception import ElasticException
 from requests import ConnectionError
 import simplejson
 from gevent import socket
@@ -361,7 +362,11 @@ class ElasticPillow(BasicPillow):
             return True
 
         es = self.get_es()
-        res = es.head(self.es_index)
+        try:
+            res = es.head(self.es_index)
+        except ElasticException, ex:
+            if ex.status_code == 404:
+                res = False
         return res
 
     def get_doc_path(self, doc_id):
@@ -402,7 +407,7 @@ class ElasticPillow(BasicPillow):
         Coarse way of deleting an index - a todo is to set aliases where need be
         """
         es = self.get_es()
-        if es.head(self.es_index):
+        if self.index_exists():
             es.delete(self.es_index)
 
     def create_index(self):
@@ -415,7 +420,7 @@ class ElasticPillow(BasicPillow):
     def change_trigger(self, changes_dict):
         if changes_dict.get('deleted', False):
             try:
-                if self.get_es().head(path=self.get_doc_path(changes_dict['id'])):
+                if self.doc_exists(changes_dict['id']):
                     self.get_es().delete(path=self.get_doc_path(changes_dict['id']))
             except Exception, ex:
                 pillow_logging.error("ElasticPillow: error deleting route %s - ignoring: %s" % \
@@ -434,7 +439,10 @@ class ElasticPillow(BasicPillow):
         """
         es = self.get_es()
         doc_path = self.get_doc_path(doc_id)
-        head_result = es.head(doc_path)
+        try:
+            head_result = es.head(doc_path)
+        except Exception, ex:
+            head_result=False
         return head_result
 
     def bulk_builder(self, changes):
@@ -589,6 +597,14 @@ class AliasedElasticPillow(ElasticPillow):
         aliased_indexes = es[self.es_alias].get('_aliases')
         return aliased_indexes.keys()
 
+    def alias_exists(self):
+        es = self.get_es()
+        try:
+            return es.head(self.es_alias)
+        except ElasticException, ex:
+            return False
+
+
     def assume_alias(self):
         """
         For this instance, have the index that represents this index receive the alias itself.
@@ -598,7 +614,8 @@ class AliasedElasticPillow(ElasticPillow):
         """
 
         es = self.get_es()
-        if es.head(self.es_alias):
+        #if es.head(self.es_alias):
+        if self.alias_exists():
             #remove all existing aliases - this is destructive and could be harmful, but for current
             #uses, it is legal - in a more delicate routing arrangement, a configuration file of
             # some sort should be in use.
@@ -682,7 +699,11 @@ class AliasedElasticPillow(ElasticPillow):
         Overrided based upon the doc type
         """
         es = self.get_es()
-        head_result = es.head(self.get_doc_path_typed(doc_dict))
+        try:
+            head_result = es.head(self.get_doc_path_typed(doc_dict))
+        except ElasticException, ex:
+            if ex.status_code == 404:
+                head_result = False
         return head_result
 
     @memoized
