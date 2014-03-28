@@ -465,7 +465,7 @@ class ElasticPillow(BulkPillow):
 
     def set_mapping(self, type_string, mapping):
         if self.online:
-            return self.send_robust("%s/%s/_mapping" % (self.es_index, type_string), data=mapping)
+            return self.send_robust("%s/_mapping/%s" % (self.es_index, type_string), data=mapping)
         else:
             return {"ok": True, "acknowledged": True}
 
