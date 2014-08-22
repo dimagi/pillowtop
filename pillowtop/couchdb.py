@@ -28,7 +28,7 @@ class CachedCouchDB(Database):
 
     def open_doc(self, doc_id, check_main=True):
         doc = self._docs.get(doc_id)
-        if not doc and check_main:
+        if (not doc and check_main) or doc['_rev'] != self.get_rev(doc_id):
             doc = super(CachedCouchDB, self).open_doc(doc_id)
             self._docs[doc_id] = doc
 
