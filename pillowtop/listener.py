@@ -157,14 +157,14 @@ class BasicPillow(object):
             })
             query_params.update(self.extra_args)
             try:
-                r = requests.get(uri, params=query_params, stream=True)
+                r = requests.get(uri, params=query_params, stream=True, timeout=2*60)
                 for line in r.iter_lines():
                     change = self._parse_change(line)
                     if change:
                         self.processor(change)
                     else:
                         self.touch_checkpoint(min_interval=CHECKPOINT_MIN_WAIT)
-            except PillowtopCheckpointReset:
+            except (PillowtopCheckpointReset, requests.exceptions.Timeout):
                 self.changes_seen = 0
 
     def _parse_change(self, line):
@@ -485,6 +485,7 @@ class BulkPillow(BasicPillow):
 
     def send_bulk(self, payload):
         raise NotImplementedError()
+
 
 class ElasticPillow(BulkPillow):
     """
