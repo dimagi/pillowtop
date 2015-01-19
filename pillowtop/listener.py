@@ -164,6 +164,21 @@ class BasicPillow(object):
             except PillowtopCheckpointReset:
                 self.changes_seen = 0
 
+    def run_burst(self):
+        """
+        Use this for testing pillows. Will run through the changes stream once.
+        """
+        changes_stream = ChangesStream(
+            db=self.couch_db,
+            since=self.since,
+            filter=self.couch_filter,
+            include_docs=self.include_docs,
+            **self.extra_args
+        )
+        for change in changes_stream:
+            if change:
+                self.processor(change)
+
     def run(self):
         """
         Couch changes stream creation
