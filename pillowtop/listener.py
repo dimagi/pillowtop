@@ -599,7 +599,6 @@ class AliasedElasticPillow(BulkPillow):
         """
         return self.update_settings(INDEX_STANDARD_SETTINGS)
 
-    @autoretry_connection()
     def get_index_mapping(self):
         es = self.get_es()
         return es.get('%s/_mapping' % self.es_index).get(self.es_index, {})
