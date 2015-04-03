@@ -12,7 +12,6 @@ import traceback
 import math
 import time
 
-from django.core.mail import send_mail
 from requests import ConnectionError
 import simplejson
 import rawes
@@ -52,39 +51,6 @@ INDEX_STANDARD_SETTINGS = {"index": {"refresh_interval": "1s",
                                      "store.throttle.type": "node",
                                      "number_of_replicas": "0"}
 }
-
-
-import functools
-
-
-class autoretry_connection(object):
-    """
-    A simple decorator for autoretrying Request ConnectionError errors infinitely with some
-    indicator back to us that there's an issue if it's gone on too long
-    """
-
-    def __call__(self, fn):
-        @functools.wraps(fn)
-        def decorated(*args, **kwargs):
-            current_tries = 0
-            while True:
-                try:
-                    return fn(*args, **kwargs)
-                except ConnectionError, e:
-                    next_delay = math.pow(RETRY_INTERVAL, current_tries)
-                    pillow_logging.exception('Connection error when calling {fn}: {msg} retrying after a {delay} second delay'.format(
-                        fn=fn.__name__,
-                        msg=str(e),
-                        delay=next_delay
-                    ))
-                    time.sleep(next_delay)
-                    current_tries += 1
-                    if current_tries % MAX_RETRIES == 0:
-                        pillow_logging.error("Pillowtop error, connectivity issues for %s. %s tries with %s second interval" % (fn.__name__, current_tries, RETRY_INTERVAL))
-                        send_mail("Pillowtop Connectivity Error", "Connectivity issues for %s. %s tries with %s second interval. Just letting you know so someone can look into it" % (fn.__name__, current_tries, RETRY_INTERVAL),
-                                  settings.SERVER_EMAIL, [x[1] for x in settings.ADMINS])
-
-        return decorated
 
 
 class PillowtopIndexingError(Exception):
