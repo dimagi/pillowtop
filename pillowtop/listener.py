@@ -683,14 +683,6 @@ class AliasedElasticPillow(BulkPillow):
     def send_bulk(self, payload):
         self.get_es_new().bulk(payload)
 
-    def check_alias(self):
-        """
-        Naive means to verify the alias of the current pillow iteration is matched.
-        """
-        es = self.get_es()
-        aliased_indexes = es[self.es_alias].get('_aliases')
-        return aliased_indexes.keys()
-
     # todo: remove from class - move to the ptop_es_manage command
     def assume_alias(self):
         """
