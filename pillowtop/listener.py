@@ -582,12 +582,7 @@ class AliasedElasticPillow(BulkPillow):
             # If offline, just say the index is there and proceed along
             return True
 
-        es = self.get_es()
-        res = es.head(self.es_index)
-        return res
-
-    def get_doc_path(self, doc_id):
-        return "%s/%s/%s" % (self.es_index, self.es_type, doc_id)
+        return self.get_es_new().indices.exists(self.es_index)
 
     def update_settings(self, settings_dict):
         return self.send_robust("%s/_settings" % self.es_index, data=settings_dict)
@@ -655,8 +650,8 @@ class AliasedElasticPillow(BulkPillow):
                     self.get_es_new().delete(self.es_index, id, self.es_type)
             except Exception, ex:
                 pillow_logging.error(
-                    "ElasticPillow: error deleting route %s - ignoring: %s" % (
-                        self.get_doc_path(changes_dict['id']),
+                    "ElasticPillow: error deleting document %s - ignoring: %s" % (
+                        changes_dict['id'],
                         ex,
                     )
                 )
