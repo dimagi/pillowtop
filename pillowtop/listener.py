@@ -577,7 +577,6 @@ class AliasedElasticPillow(BulkPillow):
             pillow_logging.info("Pillowtop [%s] Started with no mapping from server in memory testing mode" % self.get_name())
             self.seen_types = {}
 
-    @autoretry_connection()
     def index_exists(self):
         if not self.online:
             # If offline, just say the index is there and proceed along
