@@ -2,6 +2,7 @@ from functools import wraps
 import json
 import logging
 from couchdbkit.exceptions import ResourceNotFound
+from elasticsearch import Elasticsearch
 from psycopg2._psycopg import InterfaceError
 import pytz
 from datetime import datetime
@@ -13,7 +14,6 @@ import time
 
 from django.core.mail import send_mail
 from requests import ConnectionError
-import requests
 import simplejson
 import rawes
 from django.conf import settings
@@ -620,13 +620,23 @@ class AliasedElasticPillow(BulkPillow):
     def get_es(self):
         return rawes.Elastic('%s:%s' % (self.es_host, self.es_port), timeout=self.es_timeout)
 
+    @memoized
+    def get_es_new(self):
+        return Elasticsearch(
+            [{
+                'host': self.es_host,
+                'port': self.es_port,
+            }],
+            timeout=self.es_timeout,
+        )
+
     def delete_index(self):
         """
         Coarse way of deleting an index - a todo is to set aliases where need be
         """
-        es = self.get_es()
-        if es.head(self.es_index):
-            es.delete(self.es_index)
+        es = self.get_es_new()
+        if es.indices.exists(self.es_index):
+            es.indices.delete(self.es_index)
 
     def create_index(self):
         """
@@ -636,14 +646,14 @@ class AliasedElasticPillow(BulkPillow):
         self.set_index_normal_settings()
 
     def refresh_index(self):
-        self.get_es().post("%s/_refresh" % self.es_index)
+        self.get_es_new().indices.refresh(self.es_index)
 
     def change_trigger(self, changes_dict):
         id = changes_dict['id']
         if changes_dict.get('deleted', False):
             try:
-                if self.get_es().head(path=self.get_doc_path(id)):
-                    self.get_es().delete(path=self.get_doc_path(id))
+                if self.doc_exists(id):
+                    self.get_es_new().delete(self.es_index, id, self.es_type)
             except Exception, ex:
                 pillow_logging.error(
                     "ElasticPillow: error deleting route %s - ignoring: %s" % (
@@ -654,16 +664,12 @@ class AliasedElasticPillow(BulkPillow):
             return None
         return super(AliasedElasticPillow, self).change_trigger(changes_dict)
 
-    @autoretry_connection()
     def doc_exists(self, doc_id):
         """
         Using the HEAD 404/200 result API for document existence
         Returns True if 200(exists)
         """
-        es = self.get_es()
-        doc_path = self.get_doc_path(doc_id)
-        head_result = es.head(doc_path)
-        return head_result
+        return self.get_es_new().exists(self.es_index, doc_id, self.es_type)
 
     def send_robust(self, path, data=None, retries=MAX_RETRIES,
             except_on_failure=False, update=False):
