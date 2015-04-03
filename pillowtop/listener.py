@@ -566,8 +566,7 @@ class AliasedElasticPillow(BulkPillow):
         return self.update_settings(INDEX_STANDARD_SETTINGS)
 
     def get_index_mapping(self):
-        es = self.get_es()
-        return es.get('%s/_mapping' % self.es_index).get(self.es_index, {})
+        return self.get_es_new().indices.get_mapping(self.es_index)
 
     def set_mapping(self, type_string, mapping):
         if self.online:
