@@ -826,7 +826,6 @@ class AliasedElasticPillow(BulkPillow):
                 'id': doc_dict['_id']
             })
 
-    @autoretry_connection()
     def doc_exists(self, doc_dict):
         """
         Overridden based upon the doc type
