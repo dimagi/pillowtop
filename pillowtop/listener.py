@@ -681,8 +681,7 @@ class AliasedElasticPillow(BulkPillow):
             return None
 
     def send_bulk(self, payload):
-        es = self.get_es()
-        es.post('_bulk', data=payload)
+        self.get_es_new().bulk(payload)
 
     def check_alias(self):
         """
