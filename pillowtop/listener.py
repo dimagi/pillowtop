@@ -664,13 +664,6 @@ class AliasedElasticPillow(BulkPillow):
             return None
         return super(AliasedElasticPillow, self).change_trigger(changes_dict)
 
-    def doc_exists(self, doc_id):
-        """
-        Using the HEAD 404/200 result API for document existence
-        Returns True if 200(exists)
-        """
-        return self.get_es_new().exists(self.es_index, doc_id, self.es_type)
-
     def send_robust(self, path, data=None, retries=MAX_RETRIES,
             except_on_failure=False, update=False):
         return send_to_elasticsearch(
@@ -826,13 +819,18 @@ class AliasedElasticPillow(BulkPillow):
                 'id': doc_dict['_id']
             })
 
-    def doc_exists(self, doc_dict):
+    def doc_exists(self, doc_id_or_dict):
         """
-        Overridden based upon the doc type
+        Check if a document exists, by ID or the whole document.
         """
-        es = self.get_es()
-        head_result = es.head(self.get_doc_path_typed(doc_dict))
-        return head_result
+        if isinstance(doc_id_or_dict, basestring):
+            doc_id = doc_id_or_dict
+            doc_type = self.es_type
+        else:
+            assert isinstance(doc_id_or_dict, dict)
+            doc_id = doc_id_or_dict['_id']
+            doc_type = self.get_type_string(doc_id_or_dict)
+        return self.get_es_new().exists(self.es_index, doc_id, doc_type)
 
     @memoized
     def get_name(self):
