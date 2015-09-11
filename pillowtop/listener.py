@@ -129,7 +129,10 @@ class BasicPillow(object):
                             self.processor(change)
                         except Exception as e:
                             notify_exception(None, u'processor error {}'.format(e))
-                            raise
+                            while True:
+                                # whenever we encounter any error, just sleep forever and wait for the process
+                                # to be killed. This is a hacky workaround to a couchdbkit library issue
+                                time.sleep(10)
                     else:
                         self.touch_checkpoint(min_interval=CHECKPOINT_MIN_WAIT)
             except PillowtopCheckpointReset:
