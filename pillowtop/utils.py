@@ -4,8 +4,22 @@ import warnings
 from datetime import datetime
 from dateutil.parser import parse
 import importlib
-from django.conf import settings
 import pytz
+
+
+class PillowtopConfigurationException(Exception):
+    pass
+
+
+def import_settings():
+    try:
+        from django.conf import settings
+    except Exception, ex:
+        # if we are not in a django context, then import local pillowsettings
+        print "django import"
+        print ex
+        import pillowsettings as settings
+    return settings
 
 
 def import_pillows(instantiate=True):
@@ -25,6 +39,8 @@ def import_pillow_string(full_class_str, instantiate=True):
         raise ValueError("Could not find pillowtop class '%s'" % full_class_str)
 
 def get_all_pillows(instantiate=True):
+    settings = import_settings()
+
     pillowtops = []
     if hasattr(settings, 'PILLOWTOPS'):
         for k, v in settings.PILLOWTOPS.items():
@@ -36,6 +52,7 @@ def get_all_pillows(instantiate=True):
 
 
 def get_pillow_by_name(pillow_class_name, instantiate=True):
+    settings = import_settings()
     if hasattr(settings, 'PILLOWTOPS'):
         for k, v in settings.PILLOWTOPS.items():
             for full_str in v:
