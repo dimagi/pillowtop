@@ -35,7 +35,7 @@ class Change(object):
     def __contains__(self, item):
         return item in self._dict
 
-    def get(self, key, default):
+    def get(self, key, default=None):
         return self._dict.get(key, default)
 
     def pop(self, key, default):
