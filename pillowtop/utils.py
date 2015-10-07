@@ -23,11 +23,15 @@ def get_pillow_class(full_class_str):
         raise ValueError("Could not find pillowtop class '%s'" % full_class_str)
 
 
+def get_all_pillow_classes():
+    return _get_all_pillows(instantiate=False)
+
+
 def get_all_pillow_instances():
-    return get_all_pillows(instantiate=True)
+    return _get_all_pillows(instantiate=True)
 
 
-def get_all_pillows(instantiate=True):
+def _get_all_pillows(instantiate=True):
     pillowtops = []
     if hasattr(settings, 'PILLOWTOPS'):
         for k, v in settings.PILLOWTOPS.items():
@@ -60,7 +64,7 @@ def force_seq_int(seq):
 
 
 def get_all_pillows_json():
-    pillow_classes = get_all_pillows(instantiate=False)
+    pillow_classes = get_all_pillow_classes()
     return [get_pillow_json(pillow_class) for pillow_class in pillow_classes]
 
 

@@ -6,6 +6,8 @@ from pillow_retry.models import PillowError, Stub
 from django.test import TestCase
 from pillow_retry.tasks import process_pillow_retry
 from pillowtop.couchdb import CachedCouchDB
+from pillowtop.feed.couch import change_from_couch_row
+from pillowtop.feed.interface import Change
 from pillowtop.listener import BasicPillow
 
 
@@ -30,12 +32,12 @@ class PillowRetryTestCase(TestCase):
 
     def test_id(self):
         id = '12345'
-        change_dict = {'id': id, 'seq': 54321, 'changes': [{'_rev': 'abc123'}]}
+        change_dict = {'id': id, 'seq': 54321}
         error = create_error(change_dict)
         self.assertEqual(error.doc_id, id)
         self.assertEqual(error.pillow, 'pillow_retry.tests.FakePillow')
-        self.assertEqual(error.change_dict, change_dict)
-
+        self.assertEqual(error.change_object.id, id)
+        self.assertEqual(error.change_object.sequence_id, 54321)
 
     def test_attempts(self):
         message = 'ex message'
@@ -109,6 +111,42 @@ class PillowRetryTestCase(TestCase):
         ).all()
         self.assertEqual(len(errors), 3)
 
+    def test_get_errors_to_process_queued(self):
+        date = datetime.utcnow()
+        error = create_error({'id': 1}, attempts=0)
+        error.date_next_attempt = date
+        error.save()
+
+        queued_error = create_error({'id': 2}, attempts=0)
+        queued_error.date_next_attempt = date
+        queued_error.queued = True
+        queued_error.save()
+
+        errors = PillowError.get_errors_to_process(
+            date,
+        ).all()
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(error.id, errors[0]['id'])
+
+    def test_get_errors_to_process_queued_update(self):
+        date = datetime.utcnow()
+        error = create_error({'id': 1}, attempts=0)
+        error.date_next_attempt = date
+        error.save()
+
+        errors = PillowError.get_errors_to_process(
+            date,
+        ).all()
+        self.assertEqual(len(errors), 1)
+
+        # check that calling update on the return value has the desired effect
+        errors.update(queued=True)
+
+        errors = PillowError.get_errors_to_process(
+            date,
+        ).all()
+        self.assertEqual(len(errors), 0)
+
     def test_get_errors_to_process_max_limit(self):
         # see settings.PILLOW_RETRY_MULTI_ATTEMPTS_CUTOFF
         date = datetime.utcnow()
@@ -159,7 +197,7 @@ class PillowRetryTestCase(TestCase):
         """
         id = 'test_doc'
         FakePillow.couch_db._docs[id] = {'id': id, 'property': 'value'}
-        change_dict = {'id': id, 'seq': 54321, 'changes': [{'_rev': 'abc123'}]}
+        change_dict = {'id': id, 'seq': 54321}
         error = create_error(change_dict)
         error.save()
         process_pillow_retry(error.id)
@@ -169,11 +207,8 @@ class PillowRetryTestCase(TestCase):
             PillowError.objects.get(id=error.id)
 
     def test_deleted_doc(self):
-        """
-        see FakePillow.process_change
-        """
         id = 'test_doc'
-        change_dict = {'id': id, 'seq': 54321, 'changes': [{'_rev': 'abc123'}]}
+        change_dict = {'id': id, 'seq': 54321}
         error = create_error(change_dict)
         error.save()
         # this used to error out
@@ -208,6 +243,7 @@ class PillowRetryTestCase(TestCase):
 
         errors = PillowError.get_errors_to_process(datetime.utcnow()).all()
         self.assertEqual(len(errors), 2)
+
 
 class FakePillow(BasicPillow):
     couch_db = CachedCouchDB(Stub.get_db().uri, readonly=True)

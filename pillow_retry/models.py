@@ -6,6 +6,7 @@ from django.conf import settings
 import math
 from django.db import models
 from django.db.models.aggregates import Count
+from pillowtop.feed.couch import change_from_couch_row, force_to_change
 
 ERROR_MESSAGE_LENGTH = 512
 
@@ -37,10 +38,11 @@ class PillowError(models.Model):
     domains = models.CharField(max_length=255, db_index=True, null=True)
     doc_type = models.CharField(max_length=255, db_index=True, null=True)
     doc_date = models.DateTimeField(null=True)
+    queued = models.BooleanField(default=False)
 
     @property
-    def change_dict(self):
-        return json.loads(self.change) if self.change else {'id': self.doc_id}
+    def change_object(self):
+        return change_from_couch_row(json.loads(self.change) if self.change else {'id': self.doc_id})
 
     class Meta:
         app_label = 'pillow_retry'
@@ -73,9 +75,9 @@ class PillowError(models.Model):
     @classmethod
     def get_or_create(cls, change, pillow, change_meta=None):
         pillow_path = path_from_object(pillow)
-
-        change.get('doc', None)
-        doc_id = change['id']
+        change = force_to_change(change)
+        change.document
+        doc_id = change.id
         try:
             error = cls.objects.get(doc_id=doc_id, pillow=pillow_path)
         except cls.DoesNotExist:
@@ -86,7 +88,7 @@ class PillowError(models.Model):
                 date_created=now,
                 date_last_attempt=now,
                 date_next_attempt=now,
-                change=json.dumps(change)
+                change=json.dumps(change.to_dict())
             )
 
             if change_meta:
@@ -125,11 +127,15 @@ class PillowError(models.Model):
         max_attempts = settings.PILLOW_RETRY_QUEUE_MAX_PROCESSING_ATTEMPTS
         multi_attempts_cutoff = cls.multi_attempts_cutoff()
         query = PillowError.objects \
+            .filter(queued=False) \
             .filter(date_next_attempt__lte=utcnow) \
             .filter(
                 models.Q(current_attempt=0) |
                 (models.Q(total_attempts__lte=multi_attempts_cutoff) & models.Q(current_attempt__lte=max_attempts))
             )
+
+        # temporarily disable queuing of ConfigurableIndicatorPillow errors
+        query = query.filter(~models.Q(pillow='corehq.apps.userreports.pillow.ConfigurableIndicatorPillow'))
 
         if not fetch_full:
             query = query.values('id', 'date_next_attempt')
@@ -150,6 +156,7 @@ class PillowError(models.Model):
 
         multi_attempts_cutoff = cls.multi_attempts_cutoff()
         return PillowError.objects.filter(
+            models.Q(queued=False),
             models.Q(date_last_attempt__lt=last_attempt_lt),
             models.Q(current_attempt__gte=attempts_gte) | models.Q(total_attempts__gte=multi_attempts_cutoff)
         ).update(
