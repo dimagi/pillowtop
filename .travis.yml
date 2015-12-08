@@ -1,14 +1,7 @@
 language: python
-sudo: true
 cache: pip
 python:
  - "2.7"
-before_install:
-  # downgrade ES to the version we use: http://docs.travis-ci.com/user/database-setup/#Using-a-specific-version-of-ElasticSearch
-  - "curl -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-0.90.5.deb && sudo dpkg -i --force-confnew elasticsearch-0.90.5.deb"
-  - "sudo service elasticsearch start"
-  - "sleep 10"
-  - "curl http://localhost:9200/"  # print ES info
 install:
  - "uname -a"
  - "lsb_release -a"
@@ -18,6 +11,9 @@ install:
  - "psql -c 'create database pillowtop' -U postgres"
  - "pip install -e . --process-dependency-links"
  - "pip install coverage coveralls"
+before_script:
+  - "sleep 10"
+  - "curl http://localhost:9200/"  # print ES info
 script: coverage run manage.py test
 after_success:
  - coveralls
@@ -25,3 +21,4 @@ services:
   - postgresql
   - couchdb
   - redis-server
+  - elasticsearch
